@@ -203,6 +203,11 @@
   .ev .tx small { display:block; font-weight:300; color:var(--hint); font-size:11px; }
   .who { font-size:10px; font-weight:500; padding:1px 6px; border-radius:999px; margin-right:4px; vertical-align:1px; }
   .who.x { background:var(--wait-soft); color:var(--wait); } .who.o { background:var(--acc-soft); color:var(--acc); }
+  /* строка кластера: названия длинные — без мини-графика (ночью паузы, у всех одна «ступенька»), имя в две строки */
+  .krow { grid-template-columns:minmax(0,1fr) auto; padding:11px 14px; }
+  .krow .k { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
+  .krow .kb, .krow .pill { grid-column:2; }
+  .krow .d { grid-column:1; white-space:normal; }
   .todo2 .it i.bad { background:var(--bad-soft); color:var(--bad); } .todo2 .it i.acc { background:var(--acc-soft); color:var(--acc); }
   .todo2 .it i.wait { background:var(--wait-soft); color:var(--wait); } .todo2 .it i.idle { background:var(--idle-soft); color:var(--idle); }
   details > summary { list-style:none; cursor:pointer; } details > summary::-webkit-details-marker { display:none; }
@@ -266,7 +271,7 @@
         return '<span data-chip="' + esc(c.id) + '"' + (view.chip === c.id ? ' class="on"' : '') + '>' + esc(c.label) + ' ' + esc(c.n) + '</span>';
       }).join('') + '</div>' +
       '<div class="klist">' + (rows.length ? rows.map(function (r) {
-        return '<div class="krow" data-id="' + esc(r.id) + '"><span class="k">' + esc(r.k) + '</span>' + spark(r.hist, r.spark) +
+        return '<div class="krow" data-id="' + esc(r.id) + '"><span class="k">' + esc(r.k) + '</span>' +
           '<span class="kb">' + esc(r.bid) + '</span><span class="d">' + esc(r.d) + '</span><span class="pill ' + esc(r.pill) + '">' + esc(r.label) + '</span></div>';
       }).join('') : '<div class="empty">В этой группе пусто</div>') + '</div>';
   }
