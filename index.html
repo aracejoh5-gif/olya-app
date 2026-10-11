@@ -203,6 +203,10 @@
   .ev .tx small { display:block; font-weight:300; color:var(--hint); font-size:11px; }
   .who { font-size:10px; font-weight:500; padding:1px 6px; border-radius:999px; margin-right:4px; vertical-align:1px; }
   .who.x { background:var(--wait-soft); color:var(--wait); } .who.o { background:var(--acc-soft); color:var(--acc); }
+  .todo2 .it i.bad { background:var(--bad-soft); color:var(--bad); } .todo2 .it i.acc { background:var(--acc-soft); color:var(--acc); }
+  .todo2 .it i.wait { background:var(--wait-soft); color:var(--wait); } .todo2 .it i.idle { background:var(--idle-soft); color:var(--idle); }
+  details > summary { list-style:none; cursor:pointer; } details > summary::-webkit-details-marker { display:none; }
+  .notes p { margin:0; font-size:12px; font-weight:300; color:var(--hint); line-height:1.4; }
   .sum { background:var(--card); border-radius:22px; padding:12px 14px; -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
   .sum p { margin:0 0 6px; font-weight:300; font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
   .sum p.h { font-weight:500; font-size:14px; margin-top:10px; }
@@ -226,7 +230,8 @@
   }
   theme();
   if (tg && tg.onEvent) tg.onEvent('themeChanged', theme);
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; })
+    .replace(/(\d) (?=\d{3}\b)/g, '$1&nbsp;').replace(/ ₽/g, '&nbsp;₽'); }      // «12 872 ₽» не рвётся по строкам
   function tap() { try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {} }
   function spark(hist, color) {
     var v = (hist || []).filter(function (x) { return x != null; });
@@ -277,11 +282,43 @@
       }).join('') : '<div class="empty" style="padding:8px 0 12px">За час ставка не менялась</div>') + '</div>' +
       '<div class="advice"><span class="l">Совет · ' + esc(c.label) + '</span><span>' + esc(c.advice) + '</span></div>';
   }
+  function num(x) { return (x == null || x === '' || isNaN(x)) ? '—' : Math.round(x).toLocaleString('ru-RU').replace(/,/g, ' '); }
+  function n0(s) { var v = parseFloat(String(s).replace(/[\s ]/g, '').replace(',', '.')); return isNaN(v) ? null : v; }
+  function msk(iso) { try { return new Date(iso).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow'}); } catch (e) { return ''; } }
+  function acts(list) {
+    return list.map(function (a, i) { return '<div class="it"><i class="' + esc(a.c) + '">' + (i + 1) + '</i><span>' + esc(a.t) + '<small>' + esc(a.w) + '</small></span></div>'; }).join('');
+  }
   function summary() {
-    if (!S.summary) return head() + '<div class="empty">Сводка появится после 09:30</div>';
-    return head() + '<div class="sum">' + S.summary.lines.map(function (ln, i) {
-      return ln.trim() ? '<p class="' + (i === 0 || /^(dacutavio|daconiri)/.test(ln) ? 'h' : '') + '">' + esc(ln) + '</p>' : '';
-    }).join('') + '</div>';
+    var sm = S.summary;
+    if (!sm) return head() + '<div class="empty">Сводка появится после 09:30</div>';
+    if (!sm.brands) return head() + '<div class="sum">' + sm.lines.map(function (ln) { return ln.trim() ? '<p>' + esc(ln) + '</p>' : ''; }).join('') + '</div>';
+    var bs = sm.brands, bi = Math.min(view.brand || 0, bs.length - 1), b = bs[bi];
+    var h = '<p class="head">Сводка на <b>' + esc(msk(sm.at)) + '</b> · утренняя, раз в день</p>';
+    if (bs.length > 1) h += '<div class="chips" style="margin-top:0">' + bs.map(function (x, i) {
+      return '<span data-brand="' + i + '"' + (i === bi ? ' class="on"' : '') + '>' + esc(x.title) + ' ' + x.acts.length + '</span>'; }).join('') + '</div>';
+    var cpo = b.cpo7 ? num(b.cpo7) + (b.cpo_prev ? '<small style="font-size:10px;opacity:.85"> было ' + num(b.cpo_prev) + '</small>' : '') : '—';
+    h += '<div class="hero" style="margin-bottom:8px"><span class="t">Расход вчера · ' + esc(b.title) + '</span><span class="big">' + num(b.spend1) + '<small> ₽</small></span>' +
+      '<div class="minirow"><span>Заказы вчера<b>' + num(b.orders1) + '</b></span><span>CPO 7 дн.<b>' + cpo + '</b></span><span>Ждут решения<b>' + b.acts.length + '</b></span></div></div>';
+    if (b.quiet) return h + '<div class="empty">Реклама почти стоит: ' + num(b.spend7) + ' ₽ за 7 дней</div>';
+    h += '<p class="sec">Что сделать · сначала, где больше денег</p>';
+    h += b.acts.length ? '<div class="todo2">' + acts(b.acts.slice(0, 5)) +
+      (b.acts.length > 5 ? '<details><summary class="more">и ещё ' + (b.acts.length - 5) + ' — показать</summary><div style="display:grid;gap:8px;margin-top:8px">' + acts(b.acts.slice(5)).replace(/<i class="(\w+)">(\d+)</g, function (m, c, n) { return '<i class="' + c + '">' + (+n + 5) + '<'; }) + '</div></details>' : '') + '</div>'
+      : '<div class="todo2"><div class="it"><i class="ok">✓</i><span>Ставки поиска в пределах выгодного</span></div></div>';
+    if (b.shelves.length) {
+      h += '<p class="sec">Полки · расход за 30 дней · CPO полок неточен — проверять тестом отключения</p><div class="hlist">' + b.shelves.map(function (x) {
+        var c = n0(x.cpo), be = n0(x.be), over = c != null && be != null && c > be;
+        var pc = c == null || be == null ? 0 : over ? Math.round(100 * be / c) : 100, ring = c == null ? 'idle' : over ? 'bad' : 'ok';
+        var pill = c == null ? ['Нет заказов', 'idle'] : over ? ['Дороже безубытка', 'bad'] : ['В норме', 'ok'];
+        return '<div class="hrow"><span class="ord" style="--p:' + pc + ';--ring:var(--' + ring + ')"><b>' + (n0(x.carts) >= 1000 ? (n0(x.carts) / 1000).toFixed(1).replace('.', ',') + 'к' : esc(x.carts)) + '</b><i>корз</i></span>' +
+          '<span class="k">' + esc(x.name) + '</span><span class="v">' + esc(x.spend) + '</span>' +
+          '<span class="d">CPO ' + esc(x.cpo) + ' · безубыток ' + esc(x.be) + ' · ' + esc(x.bid) + '</span><span class="pill p-' + pill[1] + '">' + pill[0] + '</span></div>';
+      }).join('') + '</div>';
+    }
+    if (b.dels.length) h += '<p class="sec">Чистка ключей · не больше 2 на товар</p><div class="todo2">' +
+      acts(b.dels.map(function (x) { return {c: 'bad', t: x.t, w: x.w}; })) + '</div>';
+    if (b.notes.length) h += '<details style="margin-top:8px"><summary class="sec">Примечания · ' + b.notes.length + '</summary><div class="todo2 notes">' +
+      b.notes.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '</div></details>';
+    return h;
   }
   function render() {
     renderTabs();
@@ -291,12 +328,13 @@
   function back() { view.cluster = null; render(); window.scrollTo(0, 0); }
   if (tg && tg.BackButton && tg.BackButton.onClick) tg.BackButton.onClick(back);
   document.body.addEventListener('click', function (ev) {
-    var t = ev.target.closest('[data-tab],[data-chip],[data-id],[data-back]');
+    var t = ev.target.closest('[data-tab],[data-chip],[data-id],[data-back],[data-brand]');
     if (!t || !S) return;
     tap();
     if (t.dataset.back) return back();
     if (t.dataset.tab) view.tab = t.dataset.tab;
     if (t.dataset.chip) view.chip = t.dataset.chip;
+    if (t.dataset.brand != null) view.brand = +t.dataset.brand;
     if (t.dataset.id) { view.cluster = t.dataset.id; window.scrollTo(0, 0); }
     render();
   });
