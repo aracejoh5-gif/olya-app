@@ -268,8 +268,8 @@
   }
   theme();
   if (tg && tg.onEvent) tg.onEvent('themeChanged', theme);
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; })
-    .replace(/(\d) (?=\d{3}\b)/g, '$1&nbsp;').replace(/ ₽/g, '&nbsp;₽'); }      // «12 872 ₽» не рвётся по строкам
+  function escA(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  function esc(s) { return escA(s).replace(/(\d) (?=\d{3}\b)/g, '$1&nbsp;').replace(/ ₽/g, '&nbsp;₽'); }   // текст: «12 872 ₽» не рвётся; в атрибуты — escA
   function tap() { try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {} }
   function spark(hist, color) {
     var v = (hist || []).filter(function (x) { return x != null; });
@@ -292,7 +292,12 @@
       '<div data-tab="sum" class="' + (view.tab === 'sum' ? 'on' : '') + '">Сводка</div>';
     tabs.style.display = view.cluster ? 'none' : 'flex';
   }
-  function head() { return '<p class="head">Оля · <b>' + esc(S.title) + '</b>' + (S.fresh ? ' · замер ' + esc(S.fresh) : '') + '</p>'; }
+  function day(iso) { try { return new Date(iso).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit', timeZone: 'Europe/Moscow'}); } catch (e) { return ''; } }
+  function head() {
+    var old = S.now && (Date.now() - new Date(S.now).getTime()) > 20 * 60 * 1000;      // крон экрана — раз в 10 мин
+    return (old ? '<div class="stale">Данные от ' + esc(day(S.now)) + ' ' + esc(msk(S.now)) + ' — сервер давно не обновлял экран</div>' : '') +
+      '<p class="head">Оля · <b>' + esc(S.title) + '</b>' + (S.fresh ? ' · замер ' + esc(S.fresh) : '') + '</p>';
+  }
   function cabinet() {
     var h = S.hero, rows = S.rows.filter(function (r) { return view.chip === 'all' || r.group === view.chip; });
     return head() +
@@ -301,11 +306,11 @@
       '<span class="nx">следующее решение в ' + esc(h.ticks[h.next]) + '</span></div>' +
       tilesHtml(S.tiles) +
       '<div class="chips">' + S.chips.map(function (c) {
-        return '<span data-chip="' + esc(c.id) + '"' + (view.chip === c.id ? ' class="on"' : '') + '>' + esc(c.label) + ' ' + esc(c.n) + '</span>';
+        return '<span data-chip="' + escA(c.id) + '"' + (view.chip === c.id ? ' class="on"' : '') + '>' + esc(c.label) + ' ' + esc(c.n) + '</span>';
       }).join('') + '</div>' +
       '<div class="klist">' + (rows.length ? rows.map(function (r) {
-        return '<div class="krow" data-id="' + esc(r.id) + '" title="' + esc(r.label) + '"><span class="ic ' + esc(r.c) + '" aria-label="' + esc(r.label) + '">' + esc(r.ic) + '</span>' +
-          '<span class="k">' + esc(r.k) + '</span><span class="kb">' + esc(r.bid) + '</span><span class="d">' + esc(r.d) + '</span><span class="r ' + esc(r.c) + '">' + esc(r.r) + '</span></div>';
+        return '<div class="krow" data-id="' + escA(r.id) + '" title="' + escA(r.label) + '"><span class="ic ' + escA(r.c) + '" aria-label="' + escA(r.label) + '">' + esc(r.ic) + '</span>' +
+          '<span class="k">' + esc(r.k) + '</span><span class="kb">' + esc(r.bid) + '</span><span class="d">' + esc(r.d) + '</span><span class="r ' + escA(r.c) + '">' + esc(r.r) + '</span></div>';
       }).join('') : '<div class="empty">В этой группе пусто</div>') + '</div>';
   }
   function cluster(id) {
@@ -316,7 +321,7 @@
       tilesHtml(c.tiles, 't3') +
       '<div class="tl"><div class="l">Что делали XWay и Оля</div>' + (c.timeline.length ? c.timeline.map(function (e) {
         var who = e.who ? '<span class="who ' + (e.who === 'XWay' ? 'x' : 'o') + '">' + esc(e.who) + '</span>' : '';
-        return '<div class="ev"><span class="tm">' + esc(e.tm) + '</span><span class="dot" style="background:var(--' + esc(e.color) + ')"></span><span class="tx">' + who + esc(e.tx) + '<small>' + esc(e.small) + '</small></span></div>';
+        return '<div class="ev"><span class="tm">' + esc(e.tm) + '</span><span class="dot" style="background:var(--' + escA(e.color) + ')"></span><span class="tx">' + who + esc(e.tx) + '<small>' + esc(e.small) + '</small></span></div>';
       }).join('') : '<div class="empty" style="padding:8px 0 12px">За час ставка не менялась</div>') + '</div>' +
       '<div class="advice"><span class="l">Совет · ' + esc(c.label) + '</span><span>' + esc(c.advice) + '</span></div>';
   }
@@ -324,14 +329,16 @@
   function n0(s) { var v = parseFloat(String(s).replace(/[\s ]/g, '').replace(',', '.')); return isNaN(v) ? null : v; }
   function msk(iso) { try { return new Date(iso).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow'}); } catch (e) { return ''; } }
   function acts(list) {
-    return list.map(function (a, i) { return '<div class="it"><i class="' + esc(a.c) + '">' + (i + 1) + '</i><span>' + esc(a.t) + '<small>' + esc(a.w) + '</small></span></div>'; }).join('');
+    return list.map(function (a, i) { return '<div class="it"><i class="' + escA(a.c) + '">' + (i + 1) + '</i><span>' + esc(a.t) + '<small>' + esc(a.w) + '</small></span></div>'; }).join('');
   }
   function summary() {
     var sm = S.summary;
     if (!sm) return head() + '<div class="empty">Сводка появится после 09:30</div>';
     if (!sm.brands) return head() + '<div class="sum">' + sm.lines.map(function (ln) { return ln.trim() ? '<p>' + esc(ln) + '</p>' : ''; }).join('') + '</div>';
     var bs = sm.brands, bi = Math.min(view.brand || 0, bs.length - 1), b = bs[bi];
-    var h = '<p class="head">Сводка на <b>' + esc(msk(sm.at)) + '</b> · утренняя, раз в день</p>';
+    var today = day(new Date().toISOString()), sday = day(sm.at);
+    var h = (sday !== today ? '<div class="stale">Сводка от ' + esc(sday) + ' — сегодняшняя ещё не пришла</div>' : '') +
+      '<p class="head">Сводка на <b>' + esc(msk(sm.at)) + '</b> · ' + esc(sday) + ' · утренняя, раз в день</p>';
     if (bs.length > 1) h += '<div class="chips" style="margin-top:0">' + bs.map(function (x, i) {
       return '<span data-brand="' + i + '"' + (i === bi ? ' class="on"' : '') + '>' + esc(x.title) + ' ' + x.acts.length + '</span>'; }).join('') + '</div>';
     var cpo = b.cpo7 ? num(b.cpo7) + (b.cpo_prev ? '<small style="font-size:10px;opacity:.85"> было ' + num(b.cpo_prev) + '</small>' : '') : '—';
